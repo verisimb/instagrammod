@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Moderasi Instagram — IndoBERT</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --border: #1e1e2e;
+      --accent: #ff3c3c;
+      --accent2: #3cffa0;
+      --text: #e8e8f0;
+      --muted: #6b6b8a;
+      --card: #16161f;
+      --warn-bg: rgba(255, 60, 60, 0.08);
+      --warn-border: rgba(255, 60, 60, 0.35);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 16px 64px;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(255, 60, 60, 0.08) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px;
+      position: relative;
+      z-index: 1;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .badge {
+      display: inline-block;
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      padding: 4px 12px;
+      border-radius: 2px;
+      margin-bottom: 20px;
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.1s;
+    }
+
+    h1 {
+      font-size: clamp(26px, 5vw, 42px);
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1.1;
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.2s;
+    }
+
+    h1 span { color: var(--accent); }
+
+    .subtitle {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      font-family: 'Space Mono', monospace;
+      line-height: 1.6;
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.3s;
+    }
+
+    .subtitle code {
+      font-size: 11px;
+      color: var(--text);
+      background: var(--surface);
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .auth-warn {
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      color: var(--text);
+      padding: 14px 18px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      font-size: 13px;
+      line-height: 1.55;
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.35s;
+    }
+
+    .auth-warn strong {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.4s;
+    }
+
+    .panel-head {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      justify-content: space-between;
+    }
+
+    .panel-head span.stats { font-size: 10px; opacity: 0.9; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 20px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      background: #ff5555;
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px rgba(255, 60, 60, 0.3);
+    }
+
+    .event-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: min(62vh, 640px);
+      overflow-y: auto;
+      padding-right: 6px;
+    }
+
+    .event-list::-webkit-scrollbar { width: 6px; }
+    .event-list::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 99px;
+    }
+
+    .event-row {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px 16px;
+      border-left: 3px solid var(--border);
+      animation: fadeUp 0.35s ease forwards;
+    }
+
+    .event-row.deleted {
+      border-left-color: var(--accent);
+      background: rgba(255, 60, 60, 0.04);
+    }
+
+    .event-row.delete_failed {
+      border-left-color: #ff9f43;
+      background: rgba(255, 159, 67, 0.06);
+    }
+
+    .event-row.kept {
+      border-left-color: var(--accent2);
+      background: rgba(60, 255, 160, 0.04);
+    }
+
+    .event-row.skipped,
+    .event-row.classifier_error {
+      border-left-color: var(--muted);
+      background: rgba(107, 107, 138, 0.06);
+    }
+
+    .event-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .event-action {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .event-row.deleted .event-action { color: var(--accent); }
+    .event-row.delete_failed .event-action { color: #ff9f43; }
+    .event-row.kept .event-action { color: var(--accent2); }
+    .event-row.skipped .event-action,
+    .event-row.classifier_error .event-action { color: var(--muted); }
+
+    .event-time {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .event-teks {
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 10px;
+      word-break: break-word;
+    }
+
+    .event-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 18px;
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .event-meta code {
+      font-size: 10px;
+      color: var(--text);
+      background: var(--bg);
+      padding: 2px 6px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+    }
+
+    .event-detail {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      padding: 36px 16px;
+    }
+
+    footer {
+      margin-top: 48px;
+      text-align: center;
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.55s;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="badge">Instagram · Webhook</div>
+      <h1>Moderasi <span>komentar</span></h1>
+      <p class="subtitle">
+        {{ max_rows }} entri terakhir · DB: {{ db_path }}<br>
+        Webhook: <code>{{ webhook_path }}</code>
+      </p>
+    </header>
+
+    {% if auth_open %}
+    <div class="auth-warn">
+      <strong>Peringatan</strong>
+      Halaman ini terbuka tanpa Basic Auth. Set <code>MONITOR_BASIC_USER</code> dan
+      <code>MONITOR_BASIC_PASSWORD</code> di Coolify.
+    </div>
+    {% endif %}
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="stats">Riwayat event</span>
+        <a class="btn" href="{{ request.path }}">Muat ulang</a>
+      </div>
+      <div class="event-list">
+      {% for r in rows %}
+        <article class="event-row {{ r.action }}">
+          <div class="event-head">
+            <span class="event-action">{{ r.action }}</span>
+            <span class="event-time">{{ r.ts }}</span>
+          </div>
+          <div class="event-teks">{{ r.text_preview or "—" }}</div>
+          <div class="event-meta">
+            <span>ID <code>{{ r.comment_id }}</code></span>
+            <span>Label: {{ r.label or "—" }}</span>
+            <span>{% if r.prob_judi is not none %}% judi: {{ "%.2f"|format(r.prob_judi) }}{% else %}% judi: —{% endif %}</span>
+          </div>
+          {% if r.detail %}
+          <div class="event-detail">{{ r.detail }}</div>
+          {% endif %}
+        </article>
+      {% endfor %}
+      {% if not rows %}
+        <p class="empty">Belum ada event.</p>
+      {% endif %}
+      </div>
+    </div>
+
+    <footer>IndoBERT fine-tuned · Webhook moderasi komentar Instagram</footer>
+  </div>
+</body>
+</html>

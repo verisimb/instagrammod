@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from flask import Flask, Response, abort, jsonify, redirect, render_template_string, request
+from flask import Flask, Response, abort, jsonify, redirect, render_template, request
 
 logging.basicConfig(
     level=logging.INFO,
@@ -359,68 +359,6 @@ def webhooks_instagram():
     return "EVENT_RECEIVED", 200
 
 
-_MONITOR_PAGE = """
-<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Monitor moderasi Instagram</title>
-  <style>
-    :root { --bg: #0f1419; --card: #1a2332; --text: #e7ecf3; --muted: #8b98a8; --ok: #3dd598; --del: #ff6b6b; --keep: #6bcbff; --skip: #c9b058; --err: #ff9f43; }
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: ui-sans-serif, system-ui, sans-serif;
-      background: var(--bg); color: var(--text); line-height: 1.5; padding: 1.25rem 1rem 3rem; }
-    h1 { font-size: 1.35rem; font-weight: 600; margin: 0 0 0.35rem 0; }
-    p.meta { margin: 0 0 1rem; color: var(--muted); font-size: 0.9rem; }
-    .auth-warn { background: #3d2914; border: 1px solid #8b6914; color: #f5e6c8; padding: 0.6rem 0.85rem;
-      border-radius: 8px; margin-bottom: 1rem; font-size: 0.875rem; }
-    table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 10px;
-      overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,.35); font-size: 0.82rem; }
-    th { text-align: left; padding: 0.65rem 0.55rem; background: #243044; font-weight: 600; white-space: nowrap; }
-    td { padding: 0.55rem; border-top: 1px solid rgba(255,255,255,.06); vertical-align: top;
-      word-break: break-word; max-width: 28rem; }
-    .action-kept { color: var(--keep); font-weight: 600; }
-    .action-deleted { color: var(--del); font-weight: 600; }
-    .action-delete_failed { color: var(--err); font-weight: 600; }
-    .action-skipped, .action-classifier_error { color: var(--skip); font-weight: 600; }
-    .refresh { margin-top: 1rem; color: var(--muted); font-size: 0.85rem; }
-    a.reload { color: var(--keep); }
-  </style>
-</head>
-<body>
-  <h1>Monitor moderasi komentar</h1>
-  <p class="meta">{{ max_rows }} entri terakhir • DB: {{ db_path }} • Webhook: <code>{{ webhook_path }}</code></p>
-  {% if auth_open %}
-  <div class="auth-warn"><strong>Peringatan:</strong> halaman ini terbuka tanpa Basic Auth. Set MONITOR_BASIC_USER dan MONITOR_BASIC_PASSWORD di Coolify.</div>
-  {% endif %}
-  <table>
-    <thead><tr>
-      <th>Waktu</th><th>Komentar ID</th><th>Teks</th><th>Label</th><th>% judi</th><th>Tindakan</th><th>Detail</th>
-    </tr></thead>
-    <tbody>
-    {% for r in rows %}
-      <tr>
-        <td>{{ r.ts }}</td>
-        <td><code>{{ r.comment_id }}</code></td>
-        <td>{{ r.text_preview or "—" }}</td>
-        <td>{{ r.label or "—" }}</td>
-        <td>{% if r.prob_judi is not none %}{{ "%.2f"|format(r.prob_judi) }}{% else %}—{% endif %}</td>
-        <td class="action-{{ r.action }}">{{ r.action }}</td>
-        <td>{{ r.detail or "—" }}</td>
-      </tr>
-    {% endfor %}
-    {% if not rows %}
-      <tr><td colspan="7">Belum ada event.</td></tr>
-    {% endif %}
-    </tbody>
-  </table>
-  <p class="refresh">Auto-idea: bookmark halaman ini. <a class="reload" href="{{ request.path }}">Muat ulang</a>.</p>
-</body>
-</html>
-"""
-
-
 @app.route("/")
 def index_dashboard():
     ac = _monitor_auth_optional()
@@ -446,8 +384,8 @@ def index_dashboard():
         log.exception("Monitor read DB: %s", e)
         abort(500)
     auth_open = not (MONITOR_BASIC_USER and MONITOR_BASIC_PASSWORD)
-    return render_template_string(
-        _MONITOR_PAGE,
+    return render_template(
+        "dashboard.html",
         rows=rows,
         auth_open=auth_open,
         max_rows=MONITOR_MAX_ROWS,
