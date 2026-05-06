@@ -9,7 +9,7 @@ Variabel lingkungan:
   GRAPH_HOST              — default graph.instagram.com
   GRAPH_API_VERSION       — default v21.0
   MIN_CONFIDENCE_JUDI     — opsional; jika di-set (0–100), hapus hanya jika prob_judi >= ini
-  MONITOR_BASIC_USER / MONITOR_BASIC_PASSWORD — jika keduanya di-set → /monitor & /api/monitor/* pakai Basic Auth.
+  MONITOR_BASIC_USER / MONITOR_BASIC_PASSWORD — jika keduanya di-set → dashboard di `/` dan `/api/events` pakai Basic Auth.
   MONITOR_DB_PATH — file SQLite (default `<folder app>/data/monitor.sqlite`).
   MONITOR_MAX_ROWS — batas baris dalam DB (default 2000).
 """
@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from flask import Flask, Response, abort, jsonify, render_template_string, request
+from flask import Flask, Response, abort, jsonify, redirect, render_template_string, request
 
 logging.basicConfig(
     level=logging.INFO,
@@ -72,7 +72,7 @@ if not IG_ACCESS_TOKEN:
 if not MONITOR_BASIC_USER or not MONITOR_BASIC_PASSWORD:
     log.warning(
         "MONITOR_BASIC_USER / MONITOR_BASIC_PASSWORD kosong — "
-        "/monitor dapat diakses publik tanpa login (set untuk produksi)."
+        "dashboard `/` dapat diakses publik tanpa login (set untuk produksi)."
     )
 
 _monitor_lock = threading.Lock()
@@ -115,7 +115,7 @@ with _monitor_lock:
         _monitor_init_schema(_mc)
         _mc.close()
     except Exception as e:
-        log.warning("Monitoring DB tidak siap (%s); /monitor bisa error.", e)
+        log.warning("Monitoring DB tidak siap (%s); dashboard `/` bisa error.", e)
 
 
 def monitor_record(
@@ -159,7 +159,7 @@ def monitor_record(
 
 
 def _monitor_auth_optional() -> None:
-    """Jika credential di-set, wajib Basic Auth untuk /monitor & /api/monitor/*."""
+    """Jika credential di-set, wajib Basic Auth untuk `/` dan `/api/events`."""
     if not MONITOR_BASIC_USER or not MONITOR_BASIC_PASSWORD:
         return None
     auth = request.authorization
@@ -390,7 +390,7 @@ _MONITOR_PAGE = """
 </head>
 <body>
   <h1>Monitor moderasi komentar</h1>
-  <p class="meta">{{ max_rows }} entri terakhir • DB: {{ db_path }}</p>
+  <p class="meta">{{ max_rows }} entri terakhir • DB: {{ db_path }} • Webhook: <code>{{ webhook_path }}</code></p>
   {% if auth_open %}
   <div class="auth-warn"><strong>Peringatan:</strong> halaman ini terbuka tanpa Basic Auth. Set MONITOR_BASIC_USER dan MONITOR_BASIC_PASSWORD di Coolify.</div>
   {% endif %}
@@ -421,8 +421,8 @@ _MONITOR_PAGE = """
 """
 
 
-@app.route("/monitor")
-def monitor_dashboard():
+@app.route("/")
+def index_dashboard():
     ac = _monitor_auth_optional()
     if ac:
         return ac
@@ -452,11 +452,17 @@ def monitor_dashboard():
         auth_open=auth_open,
         max_rows=MONITOR_MAX_ROWS,
         db_path=MONITOR_DB_PATH,
+        webhook_path="/webhooks/instagram",
     )
 
 
-@app.route("/api/monitor/events")
-def monitor_events_json():
+@app.route("/monitor")
+def legacy_monitor_redirect():
+    return redirect("/", code=308)
+
+
+@app.route("/api/events")
+def moderation_events_json():
     ac = _monitor_auth_optional()
     if ac:
         return ac
@@ -487,6 +493,14 @@ def monitor_events_json():
     return jsonify({"events": out, "count": len(out)})
 
 
+@app.route("/api/monitor/events")
+def legacy_monitor_api_redirect():
+    loc = "/api/events"
+    if request.query_string:
+        loc = "/api/events?" + request.query_string.decode()
+    return redirect(loc, code=308)
+
+
 @app.route("/health")
 def health():
     return jsonify(
@@ -495,8 +509,10 @@ def health():
         graph=f"{GRAPH_HOST}/{GRAPH_API_VERSION}",
         signature_check=bool(META_APP_SECRET),
         min_confidence_judi=MIN_CONFIDENCE_JUDI,
-        monitor_dashboard="/monitor",
-        monitor_events_api="/api/monitor/events",
+        dashboard="/",
+        events_api="/api/events",
+        webhook="/webhooks/instagram",
+        legacy_urls={"dashboard": "/monitor", "events_api": "/api/monitor/events"},
     )
 
 
