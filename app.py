@@ -114,6 +114,10 @@ def _should_delete_as_judi(result: dict[str, Any]) -> bool:
 
 def _delete_instagram_comment(comment_id: str) -> bool:
     if not IG_ACCESS_TOKEN:
+        log.warning(
+            "Skip hapus komentar %s: IG_ACCESS_TOKEN kosong di environment.",
+            comment_id,
+        )
         return False
     url = f"https://{GRAPH_HOST}/{GRAPH_API_VERSION}/{comment_id}"
     try:
